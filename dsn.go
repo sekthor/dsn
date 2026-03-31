@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"text/template"
 )
 
 type Config struct {
-	User     string
-	Password string
-	Database string
-	Host     string
-	Port     int
-	Options  url.Values
+	User         string
+	Password     string
+	PasswordFile string
+	Database     string
+	Host         string
+	Port         int
+	Options      url.Values
 }
 
 // creates a postgresql connection string with format
@@ -30,6 +32,7 @@ type Config struct {
 // postgresql://other@localhost/otherdb?connect_timeout=10&application_name=myapp
 // postgresql://host1:123,host2:456/somedb?target_session_attrs=any&application_name=myapp
 func (c Config) Postgresql() string {
+	c.Init()
 	if c.Host == "" {
 		return ""
 	}
@@ -60,6 +63,7 @@ func (c Config) Postgresql() string {
 
 // creates a postgres connection string of key-value format
 func (c Config) PostgresqlKV() string {
+	c.Init()
 	dsnElements := []string{}
 	if c.Host != "" {
 		dsnElements = append(dsnElements, fmt.Sprintf("host=%s", c.Host))
@@ -88,6 +92,7 @@ func (c Config) PostgresqlKV() string {
 }
 
 func (c Config) FromTemplate(tmplStr string) (string, error) {
+	c.Init()
 	var buffer bytes.Buffer
 	tmpl, err := template.New("dsn").Parse(tmplStr)
 	if err != nil {
@@ -98,4 +103,18 @@ func (c Config) FromTemplate(tmplStr string) (string, error) {
 		return "", err
 	}
 	return buffer.String(), nil
+}
+
+func (c *Config) Init() {
+	if c.Password != "" {
+		return
+	}
+
+	if c.PasswordFile != "" {
+		data, err := os.ReadFile(c.PasswordFile)
+		if err != nil {
+			return
+		}
+		c.Password = string(data)
+	}
 }
